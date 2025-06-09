@@ -61,7 +61,7 @@ class MyApp extends StatelessWidget {
             elevation: 0,
           ),
         ),
-        home: const PokerAnalysisScreen(),
+        home: const RootTabScreen(),
       ),
     );
   }
@@ -98,15 +98,16 @@ class HandData {
       communityCards: List<String>.from(json['community_cards'] ?? []),
       position: json['position'] ?? '',
       actions: (json['actions'] as List?)
-          ?.map((a) => ActionData.fromJson(a))
-          .toList() ?? [],
+              ?.map((a) => ActionData.fromJson(a))
+              .toList() ??
+          [],
       result: json['result'] ?? '',
       potSize: (json['pot_size'] ?? 0).toDouble(),
       opponents: (json['opponents'] as List?)
           ?.map((o) => OpponentData.fromJson(o))
           .toList(),
-      streetPots: json['streetPots'] != null 
-          ? Map<String, double>.from(json['streetPots']) 
+      streetPots: json['streetPots'] != null
+          ? Map<String, double>.from(json['streetPots'])
           : null,
     );
   }
@@ -272,12 +273,17 @@ class PokerAnalysisProvider extends ChangeNotifier {
       // Load hands.csv
       final handsContent = await rootBundle.loadString('assets/hands.csv');
       final handsRows = const CsvToListConverter().convert(handsContent);
-      _rangeData = handsRows.skip(1)
-          .where((row) => row.length >= 6 && row[0].toString().isNotEmpty && row[4].toString().isNotEmpty)
+      _rangeData = handsRows
+          .skip(1)
+          .where((row) =>
+              row.length >= 6 &&
+              row[0].toString().isNotEmpty &&
+              row[4].toString().isNotEmpty)
           .map((row) => HandRangeData.fromCsv(row))
           .toList();
 
-      print('Loaded ${_gtoData.length} GTO entries and ${_rangeData.length} range entries');
+      print(
+          'Loaded ${_gtoData.length} GTO entries and ${_rangeData.length} range entries');
     } catch (e) {
       print('Error loading CSV assets: $e');
     }
@@ -297,7 +303,7 @@ class PokerAnalysisProvider extends ChangeNotifier {
         File file = File(result.files.single.path!);
         String content = await file.readAsString();
         Map<String, dynamic> jsonData = json.decode(content);
-        
+
         // Check for different JSON formats
         if (jsonData['hands'] != null && jsonData['hands'] is List) {
           // Check if it's the detailed history format
@@ -307,7 +313,8 @@ class PokerAnalysisProvider extends ChangeNotifier {
             _hands = _convertDetailedHistoryFormat(jsonData);
           } else if (hands.isNotEmpty && hands[0]['hand_id'] != null) {
             // Standard analysis format
-            _hands = hands.map((handJson) => HandData.fromJson(handJson)).toList();
+            _hands =
+                hands.map((handJson) => HandData.fromJson(handJson)).toList();
           } else {
             throw Exception('未知のJSONフォーマットです。');
           }
@@ -327,17 +334,19 @@ class PokerAnalysisProvider extends ChangeNotifier {
 
   List<HandData> _convertDetailedHistoryFormat(Map<String, dynamic> data) {
     final convertedHands = <HandData>[];
-    
+
     if (data['hands'] == null) return convertedHands;
-    
+
     for (final handData in data['hands']) {
       try {
         // Find user player
         final userPlayer = (handData['playerDetails'] as List).firstWhere(
-          (p) => p['playerInfo']['isUser'] == true || p['playerInfo']['name'] == "あなた",
+          (p) =>
+              p['playerInfo']['isUser'] == true ||
+              p['playerInfo']['name'] == "あなた",
           orElse: () => null,
         );
-        
+
         if (userPlayer == null) {
           print('ユーザープレイヤーが見つかりません: ハンド ${handData['gameInfo']['handNumber']}');
           continue;
@@ -349,13 +358,14 @@ class PokerAnalysisProvider extends ChangeNotifier {
           for (final action in userPlayer['detailedActions']) {
             final streetMap = {
               'プリフロップ': 'preflop',
-              'フロップ': 'flop', 
+              'フロップ': 'flop',
               'ターン': 'turn',
               'リバー': 'river'
             };
-            
+
             actions.add(ActionData(
-              street: streetMap[action['stage']] ?? action['stage'].toLowerCase(),
+              street:
+                  streetMap[action['stage']] ?? action['stage'].toLowerCase(),
               action: action['action'],
               amount: (action['amount'] ?? 0).toDouble(),
             ));
@@ -365,14 +375,16 @@ class PokerAnalysisProvider extends ChangeNotifier {
         // Convert opponents
         final opponents = <OpponentData>[];
         for (final player in handData['playerDetails']) {
-          if (player['playerInfo']['isUser'] != true && player['playerInfo']['name'] != "あなた") {
+          if (player['playerInfo']['isUser'] != true &&
+              player['playerInfo']['name'] != "あなた") {
             opponents.add(OpponentData(
               name: player['playerInfo']['name'],
               position: _convertPosition(player['playerInfo']['position']),
-              cards: player['handInfo']['holeCards'] != null 
+              cards: player['handInfo']['holeCards'] != null
                   ? List<String>.from(player['handInfo']['holeCards'])
                   : [],
-              totalBet: (player['actionSummary']['totalAmountBet'] ?? 0).toDouble(),
+              totalBet:
+                  (player['actionSummary']['totalAmountBet'] ?? 0).toDouble(),
               folded: player['handInfo']['folded'] ?? false,
             ));
           }
@@ -380,12 +392,12 @@ class PokerAnalysisProvider extends ChangeNotifier {
 
         // Determine result
         String result = 'loss';
-        if (handData['winnerInfo'] != null && handData['winnerInfo']['winners'] != null) {
+        if (handData['winnerInfo'] != null &&
+            handData['winnerInfo']['winners'] != null) {
           final winners = handData['winnerInfo']['winners'] as List;
-          final isWinner = winners.any((w) => 
-            w['name'] == userPlayer['playerInfo']['name'] || 
-            (userPlayer['playerInfo']['isUser'] == true)
-          );
+          final isWinner = winners.any((w) =>
+              w['name'] == userPlayer['playerInfo']['name'] ||
+              (userPlayer['playerInfo']['isUser'] == true));
           result = isWinner ? 'win' : 'loss';
         }
 
@@ -395,24 +407,26 @@ class PokerAnalysisProvider extends ChangeNotifier {
         final bigBlind = (gameSettings['bigBlind'] ?? 3).toDouble();
         final ante = (gameSettings['ante'] ?? 0).toDouble();
         final playerCount = gameSettings['playerCount'] ?? 6;
-        
+
         // Calculate street start pots from chronological actions
-        final streetPots = _calculateStreetPots(handData, smallBlind, bigBlind, ante, playerCount);
-        
+        final streetPots = _calculateStreetPots(
+            handData, smallBlind, bigBlind, ante, playerCount);
+
         // Calculate total pot
         double totalPot = smallBlind + bigBlind + (ante * playerCount);
         if (handData['playerDetails'] != null) {
           for (final player in handData['playerDetails']) {
-            totalPot += (player['actionSummary']['totalAmountBet'] ?? 0).toDouble();
+            totalPot +=
+                (player['actionSummary']['totalAmountBet'] ?? 0).toDouble();
           }
         }
 
         final convertedHand = HandData(
           handId: handData['gameInfo']['handNumber'],
-          yourCards: userPlayer['handInfo']['holeCards'] != null 
+          yourCards: userPlayer['handInfo']['holeCards'] != null
               ? List<String>.from(userPlayer['handInfo']['holeCards'])
               : [],
-          communityCards: handData['gameStats']['boardCards'] != null 
+          communityCards: handData['gameStats']['boardCards'] != null
               ? List<String>.from(handData['gameStats']['boardCards'])
               : [],
           position: _convertPosition(userPlayer['playerInfo']['position']),
@@ -433,11 +447,10 @@ class PokerAnalysisProvider extends ChangeNotifier {
     return convertedHands;
   }
 
-  Map<String, double> _calculateStreetPots(Map<String, dynamic> handData, 
+  Map<String, double> _calculateStreetPots(Map<String, dynamic> handData,
       double smallBlind, double bigBlind, double ante, int playerCount) {
-    
     final streetPots = <String, double>{};
-    
+
     // Initial pot (blinds + antes)
     double currentPot = smallBlind + bigBlind + (ante * playerCount);
     streetPots['preflop'] = currentPot;
@@ -452,25 +465,26 @@ class PokerAnalysisProvider extends ChangeNotifier {
 
     final actions = handData['chronologicalActions'] as List;
     String currentStreet = 'preflop';
-    
+
     for (final action in actions) {
       final stage = action['stage'];
       final streetMap = {
         'プリフロップ': 'preflop',
         'フロップ': 'flop',
-        'ターン': 'turn', 
+        'ターン': 'turn',
         'リバー': 'river'
       };
       final normalizedStreet = streetMap[stage] ?? stage.toLowerCase();
-      
+
       // If we've moved to a new street, record the pot size
       if (normalizedStreet != currentStreet) {
         streetPots[normalizedStreet] = currentPot;
         currentStreet = normalizedStreet;
       }
-      
+
       // Add bet amount to current pot
-      if (['bet', 'raise', 'call'].contains(action['action']) && action['amount'] != null) {
+      if (['bet', 'raise', 'call'].contains(action['action']) &&
+          action['amount'] != null) {
         currentPot += (action['amount'] ?? 0).toDouble();
       }
     }
@@ -481,7 +495,7 @@ class PokerAnalysisProvider extends ChangeNotifier {
   String _convertPosition(String position) {
     const positionMap = {
       'UTG': 'under_the_gun',
-      'HJ': 'hijack', 
+      'HJ': 'hijack',
       'CO': 'cutoff',
       'BTN': 'button',
       'SB': 'small_blind',
@@ -513,7 +527,7 @@ class PokerAnalysisProvider extends ChangeNotifier {
           ),
           OpponentData(
             name: 'CPU1',
-            position: 'small_blind', 
+            position: 'small_blind',
             cards: ['9♣', 'T♣'],
             totalBet: 0,
             folded: true,
@@ -521,12 +535,7 @@ class PokerAnalysisProvider extends ChangeNotifier {
         ],
         result: 'win',
         potSize: 18,
-        streetPots: {
-          'preflop': 4,
-          'flop': 18,
-          'turn': 18,
-          'river': 18
-        },
+        streetPots: {'preflop': 4, 'flop': 18, 'turn': 18, 'river': 18},
       ),
       HandData(
         handId: 2,
@@ -553,9 +562,10 @@ class PokerAnalysisProvider extends ChangeNotifier {
     double winRate = (wins / totalHands) * 100;
     double totalPots = _hands.fold(0, (sum, h) => sum + h.potSize);
     double avgPot = totalPots / totalHands;
-    int preflopRaises = _hands.where((h) => 
-        h.actions.any((a) => a.street == 'preflop' && a.action == 'raise')
-    ).length;
+    int preflopRaises = _hands
+        .where((h) =>
+            h.actions.any((a) => a.street == 'preflop' && a.action == 'raise'))
+        .length;
     double aggression = (preflopRaises / totalHands) * 100;
 
     _stats = GameStats(
@@ -568,10 +578,10 @@ class PokerAnalysisProvider extends ChangeNotifier {
 
   GTORecommendation? getGTORecommendation(HandData hand) {
     if (_gtoData.isEmpty || hand.communityCards.length < 3) return null;
-    
+
     final flop = hand.communityCards.take(3).toList();
     final boardString = _createBoardString(flop);
-    
+
     // Find exact match first
     GTOData? matchingBoard;
     try {
@@ -591,7 +601,7 @@ class PokerAnalysisProvider extends ChangeNotifier {
 
     String bestAction = 'Check';
     double bestFrequency = matchingBoard.check;
-    
+
     actions.forEach((action, frequency) {
       if (frequency > bestFrequency) {
         bestAction = action;
@@ -613,7 +623,7 @@ class PokerAnalysisProvider extends ChangeNotifier {
 
   String _createBoardString(List<String> cards) {
     if (cards.length < 3) return '';
-    
+
     final normalizedCards = cards.map((card) {
       final convertedCard = _convertCardSuit(card);
       return convertedCard[0] + convertedCard.substring(1).toLowerCase();
@@ -629,7 +639,7 @@ class PokerAnalysisProvider extends ChangeNotifier {
 
   String _normalizeBoard(String treeString) {
     if (treeString.length < 6) return '';
-    
+
     final cards = <String>[];
     for (int i = 0; i < 6; i += 2) {
       if (i + 1 < treeString.length) {
@@ -648,8 +658,14 @@ class PokerAnalysisProvider extends ChangeNotifier {
   String _convertCardSuit(String card) {
     if (card.length < 2) return card;
     const suitMap = {
-      '♠': 's', '♣': 'c', '♥': 'h', '♦': 'd',
-      's': 's', 'c': 'c', 'h': 'h', 'd': 'd'
+      '♠': 's',
+      '♣': 'c',
+      '♥': 'h',
+      '♦': 'd',
+      's': 's',
+      'c': 'c',
+      'h': 'h',
+      'd': 'd'
     };
     final rank = card[0].toUpperCase();
     final lastChar = card.substring(card.length - 1);
@@ -658,9 +674,23 @@ class PokerAnalysisProvider extends ChangeNotifier {
   }
 
   List<String> _generateAllHands() {
-    const ranks = ['A', 'K', 'Q', 'J', 'T', '9', '8', '7', '6', '5', '4', '3', '2'];
+    const ranks = [
+      'A',
+      'K',
+      'Q',
+      'J',
+      'T',
+      '9',
+      '8',
+      '7',
+      '6',
+      '5',
+      '4',
+      '3',
+      '2'
+    ];
     final hands = <String>[];
-    
+
     for (int i = 0; i < ranks.length; i++) {
       for (int j = 0; j < ranks.length; j++) {
         if (i == j) {
@@ -672,7 +702,7 @@ class PokerAnalysisProvider extends ChangeNotifier {
         }
       }
     }
-    
+
     return hands;
   }
 
@@ -685,11 +715,15 @@ class PokerAnalysisProvider extends ChangeNotifier {
     };
 
     final rows = _rangeData.where((row) => row.position == position).toList();
-    
+
     for (final row in rows) {
       if (row.hands.isNotEmpty) {
-        final hands = row.hands.split(',').map((h) => h.trim().replaceAll('"', '')).where((h) => h.isNotEmpty).toList();
-        
+        final hands = row.hands
+            .split(',')
+            .map((h) => h.trim().replaceAll('"', ''))
+            .where((h) => h.isNotEmpty)
+            .toList();
+
         switch (row.color) {
           case 'red':
             result['raise']!.addAll(hands);
@@ -725,7 +759,21 @@ class PokerAnalysisProvider extends ChangeNotifier {
     String r2 = convertedCards[1][0].toUpperCase();
     String s2 = convertedCards[1].substring(1);
 
-    const rankOrder = ['A', 'K', 'Q', 'J', 'T', '9', '8', '7', '6', '5', '4', '3', '2'];
+    const rankOrder = [
+      'A',
+      'K',
+      'Q',
+      'J',
+      'T',
+      '9',
+      '8',
+      '7',
+      '6',
+      '5',
+      '4',
+      '3',
+      '2'
+    ];
     final r1Index = rankOrder.indexOf(r1);
     final r2Index = rankOrder.indexOf(r2);
 
@@ -752,14 +800,15 @@ class PokerAnalysisProvider extends ChangeNotifier {
     };
 
     final rows = _rangeData.where((row) => row.position == position).toList();
-    
+
     for (final row in rows) {
       if (row.hands.isNotEmpty) {
-        final hands = row.hands.split(',')
+        final hands = row.hands
+            .split(',')
             .map((h) => h.trim().replaceAll('"', ''))
             .where((h) => h.isNotEmpty)
             .toList();
-        
+
         switch (row.color) {
           case 'red':
             result['raise']!.addAll(hands);
@@ -781,9 +830,23 @@ class PokerAnalysisProvider extends ChangeNotifier {
   }
 
   List<String> generateAllHands() {
-    const ranks = ['A', 'K', 'Q', 'J', 'T', '9', '8', '7', '6', '5', '4', '3', '2'];
+    const ranks = [
+      'A',
+      'K',
+      'Q',
+      'J',
+      'T',
+      '9',
+      '8',
+      '7',
+      '6',
+      '5',
+      '4',
+      '3',
+      '2'
+    ];
     final hands = <String>[];
-    
+
     for (int i = 0; i < ranks.length; i++) {
       for (int j = 0; j < ranks.length; j++) {
         if (i == j) {
@@ -795,7 +858,7 @@ class PokerAnalysisProvider extends ChangeNotifier {
         }
       }
     }
-    
+
     return hands;
   }
 }
@@ -817,7 +880,7 @@ class PokerAnalysisScreen extends StatelessWidget {
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFF0f4c3a), Color(0xFF1e6b5a)],
+            colors: [Color(0xFFF6F8FF), Color(0xFFB388FF), Color(0xFF81D4FA)],
           ),
         ),
         child: SafeArea(
@@ -848,38 +911,51 @@ class PokerAnalysisScreen extends StatelessWidget {
   }
 
   Widget _buildHeader() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.2)),
-      ),
-      child: Column(
-        children: [
-          const Text(
-            '🃏 テキサスホールデム\nハンド分析AI',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Colors.amber,
-              height: 1.2,
-            ),
-            textAlign: TextAlign.center,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.only(left: 4, bottom: 8),
+          child: Text('=SoftBank',
+              style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 22,
+                  color: Colors.black)),
+        ),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: Colors.white.withOpacity(0.2)),
           ),
-          const SizedBox(height: 10),
-          Text(
-            'プレイデータを分析して、戦略的なフィードバックを提供します',
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.white.withOpacity(0.9),
-              height: 1.3,
-            ),
-            textAlign: TextAlign.center,
+          child: Column(
+            children: [
+              const Text(
+                '🃏 テキサスホールデム\nハンド分析AI',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Color.fromARGB(255, 13, 12, 12),
+                  height: 1.2,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'プレイデータを分析して、戦略的なフィードバックを提供します',
+                style: TextStyle(
+                  fontSize: 14,
+                  color: Colors.white.withOpacity(0.9),
+                  height: 1.3,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -908,7 +984,7 @@ class PokerAnalysisScreen extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           Text(
-            'JSONファイルを選択してください',
+            ' ',
             style: TextStyle(
               fontSize: 14,
               color: Colors.white.withOpacity(0.8),
@@ -920,8 +996,8 @@ class PokerAnalysisScreen extends StatelessWidget {
               SizedBox(
                 width: double.infinity,
                 child: _buildActionButton(
-                  '📎 ファイルを選択',
-                  Colors.amber,
+                  'データ読み込み',
+                  const Color.fromARGB(255, 228, 227, 224),
                   () => context.read<PokerAnalysisProvider>().loadJsonFile(),
                 ),
               ),
@@ -929,8 +1005,8 @@ class PokerAnalysisScreen extends StatelessWidget {
               SizedBox(
                 width: double.infinity,
                 child: _buildActionButton(
-                  '🎮 デモデータで試す',
-                  Colors.green,
+                  '🎮 自動データ読み込み',
+                  const Color.fromARGB(255, 215, 221, 215),
                   () => context.read<PokerAnalysisProvider>().loadDemoData(),
                 ),
               ),
@@ -1049,8 +1125,15 @@ class PokerAnalysisScreen extends StatelessWidget {
         Container(
           padding: const EdgeInsets.all(30),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(15),
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.07),
+                blurRadius: 16,
+                offset: Offset(0, 8),
+              ),
+            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1060,7 +1143,7 @@ class PokerAnalysisScreen extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.bold,
-                  color: Colors.white,
+                  color: Colors.black,
                 ),
               ),
               const SizedBox(height: 20),
@@ -1071,7 +1154,8 @@ class PokerAnalysisScreen extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 20),
-        if (provider.rangeData.isNotEmpty) _buildHandRangeAnalysisSection(provider),
+        if (provider.rangeData.isNotEmpty)
+          _buildHandRangeAnalysisSection(provider),
         const SizedBox(height: 20),
         if (provider.gtoData.isNotEmpty) _buildGTOAnalysisSection(provider),
       ],
@@ -1141,7 +1225,7 @@ class PokerAnalysisScreen extends StatelessWidget {
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.bold,
-            color: Colors.white,
+            color: Colors.black,
           ),
         ),
         const SizedBox(height: 15),
@@ -1159,16 +1243,20 @@ class PokerAnalysisScreen extends StatelessWidget {
 
   Widget _buildHandCard(HandData hand, PokerAnalysisProvider provider) {
     final gtoRecommendation = provider.getGTORecommendation(hand);
-    
+
     return Container(
-      margin: const EdgeInsets.only(bottom: 15),
-      padding: const EdgeInsets.all(20),
+      margin: const EdgeInsets.only(bottom: 18),
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(10),
-        border: const Border(
-          left: BorderSide(color: Colors.amber, width: 4),
-        ),
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1181,7 +1269,7 @@ class PokerAnalysisScreen extends StatelessWidget {
                 style: const TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: Colors.amber,
+                  color: Colors.black,
                 ),
               ),
               Text(
@@ -1196,13 +1284,13 @@ class PokerAnalysisScreen extends StatelessWidget {
           const SizedBox(height: 15),
           Text(
             'ポジション: ${_translatePosition(hand.position)}',
-            style: const TextStyle(color: Colors.white),
+            style: const TextStyle(color: Colors.black),
           ),
           const SizedBox(height: 10),
           const Text(
             'ホールカード:',
             style: TextStyle(
-              color: Colors.white,
+              color: Colors.black,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -1212,7 +1300,7 @@ class PokerAnalysisScreen extends StatelessWidget {
           const Text(
             'コミュニティカード:',
             style: TextStyle(
-              color: Colors.white,
+              color: Colors.black,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -1222,7 +1310,7 @@ class PokerAnalysisScreen extends StatelessWidget {
           const Text(
             'アクション:',
             style: TextStyle(
-              color: Colors.white,
+              color: Colors.black,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -1248,9 +1336,11 @@ class PokerAnalysisScreen extends StatelessWidget {
   }
 
   Widget _buildPlayingCard(String card) {
-    bool isRed = card.contains('♥') || card.contains('♦') || 
-                 card.contains('h') || card.contains('d');
-    
+    bool isRed = card.contains('♥') ||
+        card.contains('♦') ||
+        card.contains('h') ||
+        card.contains('d');
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
@@ -1293,7 +1383,7 @@ class PokerAnalysisScreen extends StatelessWidget {
       child: Text(
         '${action.street}: ${action.action}${action.amount > 0 ? ' ${action.amount.toInt()}' : ''}',
         style: const TextStyle(
-          color: Colors.white,
+          color: Colors.black,
           fontSize: 12,
         ),
       ),
@@ -1324,7 +1414,7 @@ class PokerAnalysisScreen extends StatelessWidget {
           const SizedBox(height: 10),
           Text(
             _generateFeedback(hand),
-            style: const TextStyle(color: Colors.white),
+            style: const TextStyle(color: Colors.black),
           ),
         ],
       ),
@@ -1332,18 +1422,26 @@ class PokerAnalysisScreen extends StatelessWidget {
   }
 
   Widget _buildGTOAnalysisSection(PokerAnalysisProvider provider) {
-    final applicableHands = provider.hands.where((hand) => 
-      hand.position.toLowerCase() == 'button' && 
-      hand.communityCards.length >= 3 &&
-      hand.actions.any((a) => a.street == 'flop')
-    ).toList();
+    final applicableHands = provider.hands
+        .where((hand) =>
+            hand.position.toLowerCase() == 'button' &&
+            hand.communityCards.length >= 3 &&
+            hand.actions.any((a) => a.street == 'flop'))
+        .toList();
 
     if (applicableHands.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.purple.withOpacity(0.1),
+          color: Colors.white,
           borderRadius: BorderRadius.circular(15),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 10,
+              offset: Offset(0, 4),
+            ),
+          ],
         ),
         child: const Column(
           children: [
@@ -1352,14 +1450,14 @@ class PokerAnalysisScreen extends StatelessWidget {
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
-                color: Colors.white,
+                color: Colors.black,
               ),
             ),
             SizedBox(height: 10),
             Text(
               'BTNポジションでフロップをプレイしたハンドがないため、GTO分析は利用できません。',
               style: TextStyle(
-                color: Colors.white70,
+                color: Colors.black54,
               ),
               textAlign: TextAlign.center,
             ),
@@ -1389,13 +1487,21 @@ class PokerAnalysisScreen extends StatelessWidget {
       }
     }
 
-    final gtoCompliance = totalAnalyzed > 0 ? (gtoOptimalCount / totalAnalyzed) * 100 : 0.0;
+    final gtoCompliance =
+        totalAnalyzed > 0 ? (gtoOptimalCount / totalAnalyzed) * 100 : 0.0;
 
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.purple.withOpacity(0.1),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1405,7 +1511,7 @@ class PokerAnalysisScreen extends StatelessWidget {
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: Colors.black,
             ),
           ),
           const SizedBox(height: 15),
@@ -1422,7 +1528,7 @@ class PokerAnalysisScreen extends StatelessWidget {
                   children: [
                     const Text(
                       '分析対象ハンド:',
-                      style: TextStyle(color: Colors.white),
+                      style: TextStyle(color: Colors.black),
                     ),
                     Text(
                       '$totalAnalyzed',
@@ -1439,13 +1545,16 @@ class PokerAnalysisScreen extends StatelessWidget {
                   children: [
                     const Text(
                       'GTO最適プレイ:',
-                      style: TextStyle(color: Colors.white),
+                      style: TextStyle(color: Colors.black),
                     ),
                     Text(
                       '$gtoOptimalCount (${gtoCompliance.toStringAsFixed(1)}%)',
                       style: TextStyle(
-                        color: gtoCompliance >= 70 ? Colors.green : 
-                               gtoCompliance >= 50 ? Colors.orange : Colors.red,
+                        color: gtoCompliance >= 70
+                            ? Colors.green
+                            : gtoCompliance >= 50
+                                ? Colors.orange
+                                : Colors.red,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -1464,7 +1573,7 @@ class PokerAnalysisScreen extends StatelessWidget {
   Widget _buildGTOPerformanceIndicator(double compliance) {
     Color indicatorColor;
     String performanceText;
-    
+
     if (compliance >= 80) {
       indicatorColor = Colors.green;
       performanceText = '🏆 優秀: GTO理論に非常に近いプレイができています！';
@@ -1485,7 +1594,7 @@ class PokerAnalysisScreen extends StatelessWidget {
       ),
       child: Text(
         performanceText,
-        style: const TextStyle(color: Colors.white),
+        style: const TextStyle(color: Colors.black),
       ),
     );
   }
@@ -1497,7 +1606,7 @@ class PokerAnalysisScreen extends StatelessWidget {
     } catch (e) {
       flopAction = ActionData(street: 'flop', action: 'check', amount: 0);
     }
-    
+
     final actualAction = _translateActionToGTO(flopAction, hand);
     final isOptimal = actualAction == gtoRec.bestAction;
 
@@ -1522,14 +1631,17 @@ class PokerAnalysisScreen extends StatelessWidget {
           const SizedBox(height: 10),
           Text(
             'エクイティ: ${gtoRec.equity.toStringAsFixed(1)}% | EV: ${gtoRec.ev.toStringAsFixed(1)}',
-            style: TextStyle(color: Colors.white.withOpacity(0.9)),
+            style: TextStyle(color: Colors.black.withOpacity(0.9)),
           ),
           const SizedBox(height: 8),
-          Row(
+          Wrap(
+            spacing: 8,
+            runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
             children: [
               const Text(
                 'GTO推奨: ',
-                style: TextStyle(color: Colors.white),
+                style: TextStyle(color: Colors.black),
               ),
               Text(
                 '${gtoRec.bestAction} (${gtoRec.bestFrequency.toStringAsFixed(1)}%)',
@@ -1544,25 +1656,22 @@ class PokerAnalysisScreen extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: isOptimal ? Colors.green.withOpacity(0.2) : Colors.red.withOpacity(0.2),
+              color: isOptimal
+                  ? Colors.green.withOpacity(0.2)
+                  : Colors.red.withOpacity(0.2),
               borderRadius: BorderRadius.circular(5),
             ),
-            child: Row(
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 4,
+              crossAxisAlignment: WrapCrossAlignment.center,
               children: [
                 const Text(
                   '実際のアクション: ',
-                  style: TextStyle(color: Colors.white),
+                  style: TextStyle(color: Colors.black),
                 ),
                 Text(
                   actualAction,
-                  style: TextStyle(
-                    color: isOptimal ? Colors.green : Colors.red,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  isOptimal ? '✅ GTO最適' : '⚠️ GTO非最適',
                   style: TextStyle(
                     color: isOptimal ? Colors.green : Colors.red,
                     fontWeight: FontWeight.bold,
@@ -1575,7 +1684,7 @@ class PokerAnalysisScreen extends StatelessWidget {
           const Text(
             'アクション頻度:',
             style: TextStyle(
-              color: Colors.white,
+              color: Colors.black,
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -1585,7 +1694,8 @@ class PokerAnalysisScreen extends StatelessWidget {
             runSpacing: 5,
             children: gtoRec.allActions.entries.map((entry) {
               return Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(15),
@@ -1593,7 +1703,7 @@ class PokerAnalysisScreen extends StatelessWidget {
                 child: Text(
                   '${entry.key}: ${entry.value.toStringAsFixed(1)}%',
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: Colors.black,
                     fontSize: 12,
                   ),
                 ),
@@ -1609,33 +1719,34 @@ class PokerAnalysisScreen extends StatelessWidget {
     if (action.action == 'check') return 'Check';
     if (action.action == 'bet') {
       if (action.amount == 0) return 'Bet 30%';
-      
+
       // Calculate pot ratio based on street start pot
-      double streetStartPot = hand.streetPots?['flop'] ?? _calculateFlopStartPot(hand);
+      double streetStartPot =
+          hand.streetPots?['flop'] ?? _calculateFlopStartPot(hand);
       double betRatio = (action.amount / streetStartPot) * 100;
-      
+
       if (betRatio >= 75) return 'Bet 100%';
       if (betRatio >= 40) return 'Bet 50%';
       return 'Bet 30%';
     }
     if (action.action == 'call') return 'Check';
     if (action.action == 'fold') return 'Check';
-    
+
     return 'Check';
   }
 
   double _calculateFlopStartPot(HandData hand) {
     // Simple calculation - in reality this would be more complex
     double initialPot = 15; // SB + BB estimate
-    
+
     // Add preflop bets
     for (final action in hand.actions) {
-      if (action.street == 'preflop' && 
+      if (action.street == 'preflop' &&
           ['bet', 'raise', 'call'].contains(action.action)) {
         initialPot += action.amount;
       }
     }
-    
+
     return initialPot;
   }
 
@@ -1656,32 +1767,31 @@ class PokerAnalysisScreen extends StatelessWidget {
   String _generateFeedback(HandData hand) {
     // Simple feedback generation
     String handStrength = _evaluateHandStrength(hand.yourCards);
-    String positionAdvice = hand.position == 'button' 
+    String positionAdvice = hand.position == 'button'
         ? 'レイトポジションの利点を活かせています。'
-        : 'ポジションを考慮したプレイを心がけましょう。';
-    
-    String resultFeedback = hand.result == 'win' 
-        ? '良いプレイで勝利を収めました！' 
-        : '次回はより戦略的なアプローチを検討してみてください。';
-    
+        : 'ポジションを考慈したプレイを心がけましょう。';
+
+    String resultFeedback =
+        hand.result == 'win' ? '良いプレイで勝利を収めました！' : '次回はより戦略的なアプローチを検討してみてください。';
+
     return '$handStrength $positionAdvice $resultFeedback';
   }
 
   String _evaluateHandStrength(List<String> cards) {
     if (cards.length != 2) return '不明なハンド';
-    
+
     // Extract ranks (simplified)
     String rank1 = cards[0][0];
     String rank2 = cards[1][0];
-    
+
     if (rank1 == rank2) {
       if (['A', 'K', 'Q', 'J'].contains(rank1)) {
         return 'プレミアムペア（非常に強い）';
       } else {
         return 'ポケットペア（強い）';
       }
-    } else if (['A', 'K', 'Q', 'J'].contains(rank1) || 
-               ['A', 'K', 'Q', 'J'].contains(rank2)) {
+    } else if (['A', 'K', 'Q', 'J'].contains(rank1) ||
+        ['A', 'K', 'Q', 'J'].contains(rank2)) {
       return 'ハイカード（中程度）';
     } else {
       return '弱いハンド';
@@ -1693,8 +1803,15 @@ class PokerAnalysisScreen extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.blue.withOpacity(0.1),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 10,
+            offset: Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1704,7 +1821,7 @@ class PokerAnalysisScreen extends StatelessWidget {
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: Colors.black,
             ),
           ),
           const SizedBox(height: 15),
@@ -1716,24 +1833,28 @@ class PokerAnalysisScreen extends StatelessWidget {
 
   Widget _buildPositionRangeAnalysis(PokerAnalysisProvider provider) {
     const positions = ['UTG', 'HJ', 'CO', 'BTN', 'SB', 'BB'];
-    
+
     return Column(
       children: positions.map((position) {
-        final positionHands = provider.hands.where((h) => 
-          _translatePositionToShort(h.position) == position
-        ).toList();
-        
+        final positionHands = provider.hands
+            .where((h) => _translatePositionToShort(h.position) == position)
+            .toList();
+
         if (positionHands.isEmpty) return const SizedBox.shrink();
-        
+
         return _buildPositionCard(position, positionHands, provider);
       }).toList(),
     );
   }
 
-  Widget _buildPositionCard(String position, List<HandData> hands, PokerAnalysisProvider provider) {
-    final playedHands = hands.map((h) => provider.normalizeHand(h.yourCards)).where((h) => h.isNotEmpty).toList();
+  Widget _buildPositionCard(
+      String position, List<HandData> hands, PokerAnalysisProvider provider) {
+    final playedHands = hands
+        .map((h) => provider.normalizeHand(h.yourCards))
+        .where((h) => h.isNotEmpty)
+        .toList();
     final optimalRange = provider.getOptimalRange(position);
-    
+
     final allRecommendedHands = [
       ...optimalRange['raise']!,
       ...optimalRange['raiseOrCall']!,
@@ -1741,15 +1862,19 @@ class PokerAnalysisScreen extends StatelessWidget {
       ...optimalRange['call']!,
     ];
 
-    final inRange = playedHands.where((hand) => allRecommendedHands.contains(hand)).length;
-    final tooLoose = playedHands.where((hand) => !allRecommendedHands.contains(hand)).length;
-    final rangeCompliance = playedHands.isNotEmpty ? ((inRange / playedHands.length) * 100).toStringAsFixed(1) : '0';
+    final inRange =
+        playedHands.where((hand) => allRecommendedHands.contains(hand)).length;
+    final tooLoose =
+        playedHands.where((hand) => !allRecommendedHands.contains(hand)).length;
+    final rangeCompliance = playedHands.isNotEmpty
+        ? ((inRange / playedHands.length) * 100).toStringAsFixed(1)
+        : '0';
 
     return Container(
       margin: const EdgeInsets.only(bottom: 20),
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(10),
         border: const Border(left: BorderSide(color: Colors.blue, width: 4)),
       ),
@@ -1761,11 +1886,11 @@ class PokerAnalysisScreen extends StatelessWidget {
             style: const TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: Colors.white,
+              color: Colors.black,
             ),
           ),
           const SizedBox(height: 15),
-          
+
           // Stats Row
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -1775,14 +1900,14 @@ class PokerAnalysisScreen extends StatelessWidget {
               _buildRangeStat('レンジ外プレイ', '$tooLoose'),
             ],
           ),
-          
+
           const SizedBox(height: 20),
-          
+
           // Range Grid
           _buildRangeGrid(optimalRange, playedHands, provider),
-          
+
           const SizedBox(height: 15),
-          
+
           // Legend
           _buildRangeLegend(),
         ],
@@ -1798,28 +1923,29 @@ class PokerAnalysisScreen extends StatelessWidget {
           style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
-            color: Colors.amber,
+            color: Colors.black,
           ),
         ),
         Text(
           label,
           style: TextStyle(
             fontSize: 12,
-            color: Colors.white.withOpacity(0.8),
+            color: Colors.black.withOpacity(0.8),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildRangeGrid(Map<String, List<String>> optimalRange, List<String> playedHands, PokerAnalysisProvider provider) {
+  Widget _buildRangeGrid(Map<String, List<String>> optimalRange,
+      List<String> playedHands, PokerAnalysisProvider provider) {
     final allHands = provider.generateAllHands();
     final playedSet = playedHands.toSet();
 
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: Colors.black.withOpacity(0.3),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(10),
       ),
       child: GridView.builder(
@@ -1840,9 +1966,10 @@ class PokerAnalysisScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildRangeCell(String hand, Map<String, List<String>> optimalRange, bool isPlayed) {
-    Color backgroundColor = Colors.white.withOpacity(0.1); // default: fold
-    
+  Widget _buildRangeCell(
+      String hand, Map<String, List<String>> optimalRange, bool isPlayed) {
+    Color backgroundColor = Colors.white; // default: fold
+
     if (optimalRange['raise']!.contains(hand)) {
       backgroundColor = Colors.red;
     } else if (optimalRange['raiseOrCall']!.contains(hand)) {
@@ -1865,7 +1992,8 @@ class PokerAnalysisScreen extends StatelessWidget {
           style: TextStyle(
             fontSize: 10,
             fontWeight: FontWeight.bold,
-            color: backgroundColor == Colors.yellow ? Colors.black : Colors.white,
+            color:
+                backgroundColor == Colors.yellow ? Colors.black : Colors.black,
           ),
         ),
       ),
@@ -1904,31 +2032,12 @@ class PokerAnalysisScreen extends StatelessWidget {
         Text(
           label,
           style: const TextStyle(
-            color: Colors.white,
+            color: Colors.black,
             fontSize: 12,
           ),
         ),
       ],
     );
-  }
-
-  List<String> _generateAllHands() {
-    const ranks = ['A', 'K', 'Q', 'J', 'T', '9', '8', '7', '6', '5', '4', '3', '2'];
-    final hands = <String>[];
-    
-    for (int i = 0; i < ranks.length; i++) {
-      for (int j = 0; j < ranks.length; j++) {
-        if (i == j) {
-          hands.add(ranks[i] + ranks[j]); // pocket pairs
-        } else if (i < j) {
-          hands.add(ranks[i] + ranks[j] + 's'); // suited
-        } else {
-          hands.add(ranks[j] + ranks[i] + 'o'); // offsuit
-        }
-      }
-    }
-    
-    return hands;
   }
 
   String _translatePositionToShort(String position) {
@@ -1947,5 +2056,460 @@ class PokerAnalysisScreen extends StatelessWidget {
       'bb': 'BB'
     };
     return map[position.toLowerCase()] ?? position.toUpperCase();
+  }
+}
+
+// 1. HomeScreenウィジェットの追加
+class HomeScreen extends StatelessWidget {
+  const HomeScreen({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF6F8FF),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      const Text('=SoftBank',
+                          style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 22,
+                              color: Colors.black)),
+                      Row(
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.settings,
+                                color: Color(0xFF7C4DFF)),
+                            onPressed: () {
+                              showDialog(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  title: const Text('設定'),
+                                  content: const Text('設定画面（ダミー）'),
+                                  actions: [
+                                    TextButton(
+                                        onPressed: () => Navigator.pop(context),
+                                        child: const Text('閉じる'))
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.notifications,
+                                color: Color(0xFF7C4DFF)),
+                            onPressed: () {
+                              showDialog(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  title: const Text('通知'),
+                                  content: const Text('通知一覧（ダミー）'),
+                                  actions: [
+                                    TextButton(
+                                        onPressed: () => Navigator.pop(context),
+                                        child: const Text('閉じる'))
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.person,
+                                color: Color(0xFF7C4DFF)),
+                            onPressed: () {
+                              showDialog(
+                                context: context,
+                                builder: (context) => AlertDialog(
+                                  title: const Text('プロフィール'),
+                                  content: const Text('プロフィール画面（ダミー）'),
+                                  actions: [
+                                    TextButton(
+                                        onPressed: () => Navigator.pop(context),
+                                        child: const Text('閉じる'))
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                // 上部ユーザー情報
+                Row(
+                  children: [
+                    const CircleAvatar(
+                      radius: 28,
+                      backgroundColor: Color(0xFFE3E6F0),
+                      child: Icon(Icons.person,
+                          size: 36, color: Color(0xFF7C4DFF)),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'SHOOTER',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 24,
+                              color: Colors.black,
+                              decoration: TextDecoration.none,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Stack(
+                            children: [
+                              Container(
+                                height: 10,
+                                decoration: BoxDecoration(
+                                  color: Color(0xFFE0E0E0),
+                                  borderRadius: BorderRadius.circular(5),
+                                ),
+                              ),
+                              Container(
+                                height: 10,
+                                width: 120,
+                                decoration: BoxDecoration(
+                                  color: Color(0xFFB388FF),
+                                  borderRadius: BorderRadius.circular(5),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                // 情報カード2つ
+                Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        constraints: const BoxConstraints(minHeight: 100),
+                        margin: const EdgeInsets.only(right: 8),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(24),
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFB388FF), Color(0xFF81D4FA)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          boxShadow: [
+                            BoxShadow(color: Colors.black12, blurRadius: 8)
+                          ],
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(18),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Icon(Icons.attach_money,
+                                  color: Colors.white, size: 32),
+                              const SizedBox(height: 8),
+                              Text('総チップ',
+                                  style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.normal)),
+                              const SizedBox(height: 4),
+                              Text('¥0',
+                                  style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 24)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Container(
+                        constraints: const BoxConstraints(minHeight: 100),
+                        margin: const EdgeInsets.only(left: 8),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(24),
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFB388FF), Color(0xFFFFF176)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          boxShadow: [
+                            BoxShadow(color: Colors.black12, blurRadius: 8)
+                          ],
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.all(18),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Icon(Icons.description,
+                                  color: Colors.white, size: 32),
+                              const SizedBox(height: 8),
+                              Text('総ハンド数',
+                                  style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.normal)),
+                              const SizedBox(height: 4),
+                              Text('0',
+                                  style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 24)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                // SoftBankshop porkerバナー
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(18),
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(24),
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFB388FF), Color(0xFF81D4FA)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    boxShadow: [
+                      BoxShadow(color: Colors.black12, blurRadius: 8)
+                    ],
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: const [
+                            Text('SoftBankshop\nporker',
+                                style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 20)),
+                            SizedBox(height: 4),
+                            Text('情報を確認',
+                                style: TextStyle(
+                                    color: Colors.white, fontSize: 14)),
+                          ],
+                        ),
+                      ),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white.withOpacity(0.2),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
+                          child: const Text('予約はこちら',
+                              style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold)),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // TITLEバナー
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(18),
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(24),
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF8E24AA), Color(0xFFFFD600)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    boxShadow: [
+                      BoxShadow(color: Colors.black12, blurRadius: 8)
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      Text('TITLEを獲得しよう',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 20)),
+                      SizedBox(height: 4),
+                      Text('豪華報酬をゲット！',
+                          style: TextStyle(color: Colors.white, fontSize: 14)),
+                    ],
+                  ),
+                ),
+                // 予約するボタン
+                Container(
+                  width: double.infinity,
+                  margin: const EdgeInsets.only(bottom: 18),
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(24),
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFB388FF), Color(0xFF81D4FA)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                  ),
+                  child: TextButton(
+                    onPressed: () {},
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      child: Text('予約する',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18)),
+                    ),
+                  ),
+                ),
+                // 最近のハンドタイトル
+                const Padding(
+                  padding: EdgeInsets.only(left: 4, bottom: 8),
+                  child: Text('最近のハンド',
+                      style: TextStyle(
+                          color: Colors.black,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 18)),
+                ),
+                // ここに最近のハンドリスト等を追加可能
+              ],
+            ),
+          ),
+        ),
+      ),
+      // 下部ナビゲーションはRootTabScreenで管理
+    );
+  }
+}
+
+// 2. ルートウィジェットの追加
+class RootTabScreen extends StatefulWidget {
+  const RootTabScreen({Key? key}) : super(key: key);
+
+  @override
+  State<RootTabScreen> createState() => _RootTabScreenState();
+}
+
+class _RootTabScreenState extends State<RootTabScreen> {
+  int _selectedIndex = 0;
+  final List<Widget> _screens = [
+    HomeScreen(),
+    PokerAnalysisScreen(),
+    RankingScreen(),
+    Placeholder(), // ミッション
+    Placeholder(), // セトラ
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final safeIndex = _selectedIndex.clamp(0, _screens.length - 1);
+    return Scaffold(
+      body: _screens[safeIndex],
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        onTap: (index) {
+          print('タブインデックス: $index');
+          setState(() {
+            _selectedIndex = index;
+          });
+        },
+        type: BottomNavigationBarType.fixed,
+        selectedItemColor: Color(0xFF7C4DFF),
+        unselectedItemColor: Colors.black45,
+        items: const [
+          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'ホーム'),
+          BottomNavigationBarItem(icon: Icon(Icons.bar_chart), label: '分析'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.leaderboard), label: 'ランキング'),
+          BottomNavigationBarItem(icon: Icon(Icons.flag), label: 'ミッション'),
+          BottomNavigationBarItem(
+              icon: Icon(Icons.emoji_emotions), label: 'セトラ'),
+        ],
+      ),
+    );
+  }
+}
+
+// ランキング画面ウィジェットを追加
+class RankingScreen extends StatelessWidget {
+  const RankingScreen({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    // ダミーランキングデータ
+    final ranking = [
+      {'name': 'SHOOTER', 'score': 1200},
+      {'name': 'POKERKING', 'score': 1100},
+      {'name': 'AI-BOT', 'score': 950},
+      {'name': 'PLAYER4', 'score': 800},
+      {'name': 'PLAYER5', 'score': 700},
+    ];
+    return Scaffold(
+      backgroundColor: const Color(0xFFF6F8FF),
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: const Text('ランキング', style: TextStyle(color: Colors.black)),
+        centerTitle: true,
+        iconTheme: const IconThemeData(color: Colors.black),
+      ),
+      body: ListView.separated(
+        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+        itemCount: ranking.length,
+        separatorBuilder: (_, __) => const SizedBox(height: 12),
+        itemBuilder: (context, i) {
+          final user = ranking[i];
+          return Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.06),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: ListTile(
+              leading: CircleAvatar(
+                backgroundColor: i == 0 ? Color(0xFFFFD700) : Color(0xFFB388FF),
+                child: Text('${i + 1}',
+                    style: const TextStyle(
+                        color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
+              title: Text(user['name'].toString(),
+                  style: const TextStyle(fontWeight: FontWeight.bold)),
+              trailing: Text('${user['score']} pt',
+                  style: const TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          );
+        },
+      ),
+    );
   }
 }

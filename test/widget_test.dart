@@ -7,24 +7,46 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-
+import 'package:provider/provider.dart';
 import 'package:poker_analyzer/main.dart';
+import 'package:poker_analyzer/widgets/cards/playing_card.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  testWidgets('アプリの基本UIテスト', (WidgetTester tester) async {
+    // アプリを起動
+    await tester.pumpWidget(
+      ChangeNotifierProvider(
+        create: (_) => PokerAnalysisProvider(),
+        child: const MyApp(),
+      ),
+    );
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+    // ヘッダーが表示されていることを確認
+    expect(find.text('=SoftBank'), findsOneWidget);
+    expect(find.text('🃏 テキサスホールデム\nハンド分析AI'), findsOneWidget);
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    // アップロードセクションが表示されていることを確認
+    expect(find.text('📁 ハンドデータをアップロード'), findsOneWidget);
+    expect(find.text('データ読み込み'), findsOneWidget);
+    expect(find.text('🎮 自動データ読み込み'), findsOneWidget);
+  });
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+  testWidgets('カード表示のテスト', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: Column(
+            children: const [
+              PlayingCard(card: 'Ah'),
+              PlayingCard(card: 'Kd'),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    // カードが正しく表示されていることを確認
+    expect(find.text('Ah'), findsOneWidget);
+    expect(find.text('Kd'), findsOneWidget);
   });
 }

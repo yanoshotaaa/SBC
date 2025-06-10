@@ -38,6 +38,8 @@ import 'package:csv/csv.dart';
 import 'package:provider/provider.dart';
 import 'dart:convert';
 import 'dart:io';
+import 'models/game_stats.dart';
+import 'utils/logger.dart';
 
 // Main App
 void main() {
@@ -157,20 +159,6 @@ class OpponentData {
       folded: json['folded'] ?? false,
     );
   }
-}
-
-class GameStats {
-  final int totalHands;
-  final double winRate;
-  final double avgPot;
-  final double aggression;
-
-  GameStats({
-    required this.totalHands,
-    required this.winRate,
-    required this.avgPot,
-    required this.aggression,
-  });
 }
 
 // GTO Data Models
@@ -323,9 +311,8 @@ class PokerAnalysisProvider extends ChangeNotifier {
           throw Exception('有効なハンドデータが見つかりません。');
         }
       }
-    } catch (e) {
-      print('Error loading file: $e');
-      // Show error to user
+    } catch (e, stackTrace) {
+      Logger.error('ファイル読み込みエラー', error: e, stackTrace: stackTrace);
     } finally {
       _isLoading = false;
       notifyListeners();
@@ -671,39 +658,6 @@ class PokerAnalysisProvider extends ChangeNotifier {
     final lastChar = card.substring(card.length - 1);
     final suit = suitMap[lastChar] ?? lastChar;
     return rank + suit;
-  }
-
-  List<String> _generateAllHands() {
-    const ranks = [
-      'A',
-      'K',
-      'Q',
-      'J',
-      'T',
-      '9',
-      '8',
-      '7',
-      '6',
-      '5',
-      '4',
-      '3',
-      '2'
-    ];
-    final hands = <String>[];
-
-    for (int i = 0; i < ranks.length; i++) {
-      for (int j = 0; j < ranks.length; j++) {
-        if (i == j) {
-          hands.add(ranks[i] + ranks[j]); // pocket pairs
-        } else if (i < j) {
-          hands.add(ranks[i] + ranks[j] + 's'); // suited
-        } else {
-          hands.add(ranks[j] + ranks[i] + 'o'); // offsuit
-        }
-      }
-    }
-
-    return hands;
   }
 
   Map<String, List<String>> getOptimalRange(String position) {

@@ -40,6 +40,9 @@ import 'dart:convert';
 import 'dart:io';
 import 'models/game_stats.dart';
 import 'utils/logger.dart';
+import 'screens/mission_screen.dart';
+import 'screens/ranking_screen.dart';
+import 'screens/account_screen.dart';
 
 // Main App
 void main() {
@@ -2371,11 +2374,34 @@ class RootTabScreen extends StatefulWidget {
 class _RootTabScreenState extends State<RootTabScreen> {
   int _selectedIndex = 0;
   final List<Widget> _screens = [
-    HomeScreen(),
-    PokerAnalysisScreen(),
-    RankingScreen(),
-    Placeholder(), // ミッション
-    Placeholder(), // セトラ
+    const HomeScreen(),
+    const PokerAnalysisScreen(),
+    const RankingScreen(),
+    const MissionScreen(),
+    const AccountScreen(),
+  ];
+
+  final List<BottomNavigationBarItem> _bottomNavItems = [
+    const BottomNavigationBarItem(
+      icon: Icon(Icons.home),
+      label: 'ホーム',
+    ),
+    const BottomNavigationBarItem(
+      icon: Icon(Icons.bar_chart),
+      label: '分析',
+    ),
+    const BottomNavigationBarItem(
+      icon: Icon(Icons.emoji_events),
+      label: 'ランキング',
+    ),
+    const BottomNavigationBarItem(
+      icon: Icon(Icons.flag),
+      label: 'ミッション',
+    ),
+    const BottomNavigationBarItem(
+      icon: Icon(Icons.person),
+      label: 'アカウント',
+    ),
   ];
 
   @override
@@ -2394,75 +2420,7 @@ class _RootTabScreenState extends State<RootTabScreen> {
         type: BottomNavigationBarType.fixed,
         selectedItemColor: Color(0xFF7C4DFF),
         unselectedItemColor: Colors.black45,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: 'ホーム'),
-          BottomNavigationBarItem(icon: Icon(Icons.bar_chart), label: '分析'),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.leaderboard), label: 'ランキング'),
-          BottomNavigationBarItem(icon: Icon(Icons.flag), label: 'ミッション'),
-          BottomNavigationBarItem(
-              icon: Icon(Icons.emoji_emotions), label: 'セトラ'),
-        ],
-      ),
-    );
-  }
-}
-
-// ランキング画面ウィジェットを追加
-class RankingScreen extends StatelessWidget {
-  const RankingScreen({Key? key}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    // ダミーランキングデータ
-    final ranking = [
-      {'name': 'SHOOTER', 'score': 1200},
-      {'name': 'POKERKING', 'score': 1100},
-      {'name': 'AI-BOT', 'score': 950},
-      {'name': 'PLAYER4', 'score': 800},
-      {'name': 'PLAYER5', 'score': 700},
-    ];
-    return Scaffold(
-      backgroundColor: const Color(0xFFF6F8FF),
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        title: const Text('ランキング', style: TextStyle(color: Colors.black)),
-        centerTitle: true,
-        iconTheme: const IconThemeData(color: Colors.black),
-      ),
-      body: ListView.separated(
-        padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-        itemCount: ranking.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 12),
-        itemBuilder: (context, i) {
-          final user = ranking[i];
-          return Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.06),
-                  blurRadius: 8,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: ListTile(
-              leading: CircleAvatar(
-                backgroundColor: i == 0 ? Color(0xFFFFD700) : Color(0xFFB388FF),
-                child: Text('${i + 1}',
-                    style: const TextStyle(
-                        color: Colors.white, fontWeight: FontWeight.bold)),
-              ),
-              title: Text(user['name'].toString(),
-                  style: const TextStyle(fontWeight: FontWeight.bold)),
-              trailing: Text('${user['score']} pt',
-                  style: const TextStyle(fontWeight: FontWeight.bold)),
-            ),
-          );
-        },
+        items: _bottomNavItems,
       ),
     );
   }

@@ -39,14 +39,26 @@ import 'package:provider/provider.dart';
 import 'dart:convert';
 import 'dart:io';
 import 'models/game_stats.dart';
+import 'models/title.dart';
 import 'utils/logger.dart';
 import 'screens/mission_screen.dart';
 import 'screens/ranking_screen.dart';
 import 'screens/account_screen.dart';
+import 'screens/title_screen.dart';
+import 'screens/notification_screen.dart';
+import 'screens/settings_screen.dart';
+import 'providers/app_settings_provider.dart';
 
 // Main App
 void main() {
-  runApp(MyApp());
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AppSettingsProvider()),
+      ],
+      child: const MyApp(),
+    ),
+  );
 }
 
 class MyApp extends StatelessWidget {
@@ -2017,8 +2029,73 @@ class PokerAnalysisScreen extends StatelessWidget {
 }
 
 // 1. HomeScreenウィジェットの追加
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  late PlayerTitle _currentTitle;
+  final List<Map<String, dynamic>> _reservations = [
+    {
+      'id': '1',
+      'title': 'ポーカー勉強会',
+      'date': DateTime.now().add(const Duration(days: 2)),
+      'time': '19:00-21:00',
+      'location': 'オンライン',
+      'participants': 8,
+      'maxParticipants': 10,
+      'status': 'upcoming',
+    },
+    {
+      'id': '2',
+      'title': '初心者向けポーカーレッスン',
+      'date': DateTime.now().add(const Duration(days: 5)),
+      'time': '14:00-16:00',
+      'location': 'オンライン',
+      'participants': 5,
+      'maxParticipants': 8,
+      'status': 'upcoming',
+    },
+    {
+      'id': '3',
+      'title': '週末ポーカートーナメント',
+      'date': DateTime.now().add(const Duration(days: 7)),
+      'time': '13:00-18:00',
+      'location': 'オンライン',
+      'participants': 12,
+      'maxParticipants': 20,
+      'status': 'upcoming',
+    },
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _currentTitle =
+        PlayerTitle.getDefaultTitles().firstWhere((title) => title.isUnlocked);
+  }
+
+  String _getTimeAgo(DateTime date) {
+    final now = DateTime.now();
+    final difference = now.difference(date);
+
+    if (difference.inDays > 0) {
+      return '${difference.inDays}日前';
+    } else if (difference.inHours > 0) {
+      return '${difference.inHours}時間前';
+    } else if (difference.inMinutes > 0) {
+      return '${difference.inMinutes}分前';
+    } else {
+      return 'たった今';
+    }
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.month}月${date.day}日';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -2044,56 +2121,47 @@ class HomeScreen extends StatelessWidget {
                               color: Colors.black)),
                       Row(
                         children: [
+                          // 称号アイコン
                           IconButton(
-                            icon: const Icon(Icons.settings,
-                                color: Color(0xFF7C4DFF)),
-                            onPressed: () {
-                              showDialog(
-                                context: context,
-                                builder: (context) => AlertDialog(
-                                  title: const Text('設定'),
-                                  content: const Text('設定画面（ダミー）'),
-                                  actions: [
-                                    TextButton(
-                                        onPressed: () => Navigator.pop(context),
-                                        child: const Text('閉じる'))
-                                  ],
+                            icon: const Icon(Icons.emoji_events,
+                                color: Colors.black),
+                            onPressed: () async {
+                              final result = await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const TitleScreen(),
                                 ),
                               );
+                              if (result != null && result is PlayerTitle) {
+                                setState(() {
+                                  _currentTitle = result;
+                                });
+                              }
                             },
                           ),
+                          // 通知アイコン
                           IconButton(
                             icon: const Icon(Icons.notifications,
-                                color: Color(0xFF7C4DFF)),
+                                color: Colors.black),
                             onPressed: () {
-                              showDialog(
-                                context: context,
-                                builder: (context) => AlertDialog(
-                                  title: const Text('通知'),
-                                  content: const Text('通知一覧（ダミー）'),
-                                  actions: [
-                                    TextButton(
-                                        onPressed: () => Navigator.pop(context),
-                                        child: const Text('閉じる'))
-                                  ],
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      const NotificationScreen(),
                                 ),
                               );
                             },
                           ),
+                          // 設定アイコン
                           IconButton(
-                            icon: const Icon(Icons.person,
-                                color: Color(0xFF7C4DFF)),
+                            icon:
+                                const Icon(Icons.settings, color: Colors.black),
                             onPressed: () {
-                              showDialog(
-                                context: context,
-                                builder: (context) => AlertDialog(
-                                  title: const Text('プロフィール'),
-                                  content: const Text('プロフィール画面（ダミー）'),
-                                  actions: [
-                                    TextButton(
-                                        onPressed: () => Navigator.pop(context),
-                                        child: const Text('閉じる'))
-                                  ],
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const SettingsScreen(),
                                 ),
                               );
                             },
@@ -2353,6 +2421,163 @@ class HomeScreen extends StatelessWidget {
                           fontSize: 18)),
                 ),
                 // ここに最近のハンドリスト等を追加可能
+
+                // 予約一覧セクション
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Text(
+                        '予約一覧',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black,
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          // 予約一覧画面へのナビゲーション
+                        },
+                        child: const Text(
+                          'すべて見る',
+                          style: TextStyle(
+                            color: Color(0xFF7C4DFF),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                ListView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  itemCount: _reservations.length,
+                  itemBuilder: (context, index) {
+                    final reservation = _reservations[index];
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.06),
+                            blurRadius: 8,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      child: ListTile(
+                        contentPadding: const EdgeInsets.all(16),
+                        title: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF7C4DFF).withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                _formatDate(reservation['date'] as DateTime),
+                                style: const TextStyle(
+                                  color: Color(0xFF7C4DFF),
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                reservation['title'] as String,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.access_time,
+                                  size: 16,
+                                  color: Colors.grey,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  reservation['time'] as String,
+                                  style: const TextStyle(
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                const Icon(
+                                  Icons.location_on,
+                                  size: 16,
+                                  color: Colors.grey,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  reservation['location'] as String,
+                                  style: const TextStyle(
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                const Icon(
+                                  Icons.people,
+                                  size: 16,
+                                  color: Colors.grey,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '${reservation['participants']}/${reservation['maxParticipants']}人',
+                                  style: const TextStyle(
+                                    color: Colors.grey,
+                                  ),
+                                ),
+                                const Spacer(),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFF7C4DFF)
+                                        .withOpacity(0.1),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Text(
+                                    '参加する',
+                                    style: TextStyle(
+                                      color: Color(0xFF7C4DFF),
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
               ],
             ),
           ),
